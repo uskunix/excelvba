@@ -1,0 +1,104 @@
+﻿Sub ToolCostCalc()
+    '台帳まとめシートを作成(コピー先)
+    Dim srcBook As Workbook
+    Set srcBook = Workbooks.Add
+    srcBook.SaveAs "C:\Users\user\Desktop\ExcelVBA\work\work1\集計用.xls"
+    
+    Dim srcSheet As Worksheet
+    Set srcSheet = srcBook.Worksheets(1)
+    
+    '年度フォルダから台帳データを取得する関数を呼び出し
+    Dim Today As String
+    Dim ToYear As String
+    
+    For i = 1 To 3
+    
+        '今月-1,-2,-3ときの年度を取得
+        Today = DateAdd("m", -i, Date)
+        ToYear = Year(Today)
+        
+        Dim Path As String
+        Path = "C:\Users\user\Desktop\ExcelVBA\work\work1\資料\"
+        
+        Dim DPath As String
+        DPath = Path + ToYear + "\"
+        
+        Dim buf As String
+        buf = Dir(DPath & "*.xlsx")
+        
+        'djは集計の総数,jは台帳の登録数
+        Dim j As Long
+        Dim dj As Long: dj = 0
+        
+        '年度のフォルダ内にあるxlsファイル分処理を行う
+        Do While buf <> ""
+            
+            '台帳を開く(コピー元)
+            Dim daichou As Workbook
+            Set daichou = Workbooks.Open(DPath + buf)
+            Dim daichouSheet As Worksheet
+            Set daichouSheet = daichou.Worksheets(1)
+            
+            j = daichouSheet.Range("A1").End(xlDown).Row
+            
+            For k = 2 To j
+                srcSheet.Range(srcSheet.Cells(dj + k - 1, 1), srcSheet.Cells(dj + k - 1, 7)).Value = daichouSheet.Range(daichouSheet.Cells(k, 1), daichouSheet.Cells(k, 7)).Value
+            Next
+            
+            dj = dj + j - 1
+            
+            daichou.Close False
+            
+'            srcBook.Close True
+            
+            buf = Dir()
+            
+        Loop
+
+    Next
+    
+    '項目名を追記する
+    srcSheet.Rows(1).Insert
+    srcSheet.Cells(1, 1).Value = "日付"
+    srcSheet.Cells(1, 2).Value = "製品CD"
+    srcSheet.Cells(1, 3).Value = "刃物"
+    srcSheet.Cells(1, 4).Value = "サイズ"
+    srcSheet.Cells(1, 5).Value = "ホルダー"
+    srcSheet.Cells(1, 6).Value = "工程"
+    srcSheet.Cells(1, 7).Value = "売上"
+    
+    '削除対象の刃物がある行を削除する
+    Dim l As Long
+    For l = srcSheet.Range("A1").End(xlDown).Row To 2 Step -1
+        With Cells(l, "C")
+            If _
+            .Value Like "*ボディ" Or _
+            .Value Like "カッター" Or _
+            .Value Like "シャンク" Or _
+            .Value Like "ボーリングヘッド" Or _
+            .Value Like "ヘッド" Then
+                .EntireRow.Delete
+            End If
+        End With
+    Next l
+    
+    '重複した行を削除する
+    srcSheet.Range("A:G").RemoveDuplicates Columns:=Array(1, 2, 3, 4, 5, 6, 7), Header:=xlYes
+    
+    '製品CDでフィルタ
+    srcSheet.Range("B1").AutoFilter Field:=2, Criteria1:="OK99345"
+    
+    '工程でフィルタ
+    srcSheet.Range("F1").AutoFilter Field:=6, Criteria1:="20"
+    
+    'フィルタ後の費用を合計
+    Dim SumCost As Long
+    SumCost = WorksheetFunction.Subtotal(9, srcSheet.Range("G:G"))
+    srcSheet.Range("I1").Value = SumCost
+    
+    '対応する個数で合計÷個数、その後対応するCT価格一覧の行に挿入
+    
+    
+    MsgBox "処理完了"
+    
+End Sub
